@@ -1,0 +1,24 @@
+{
+  "name": "b2b-list-freshness-check",
+  "version": "1.0.0",
+  "description": "Checks how stale a B2B contact list is: an AI Agent re-exports its people from LinkedIn Sales Navigator through Evaboot, verifies the old emails, and reports who left, who changed title and which emails to fix, with one action per person.",
+  "author": {
+    "name": "Evaboot",
+    "url": "https://evaboot.com"
+  },
+  "homepage": "https://evaboot.com/blog/b2b-contact-database-vs-email-list-providers-what-s-the-difference-and-which-do-you-need",
+  "repository": "https://github.com/evaboot-labs/b2b-list-freshness-check",
+  "license": "MIT",
+  "privacyPolicyUrl": "https://evaboot.com/privacy-policy",
+  "keywords": [
+    "b2b-data",
+    "contact-database",
+    "data-decay",
+    "ai-agent",
+    "sales-navigator",
+    "evaboot",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

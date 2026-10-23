@@ -1,0 +1,579 @@
+{
+  "name": "B2B list freshness check (Evaboot)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "b302535c-14ac-4bcc-9c80-11f99c4eac98",
+      "name": "First of the month",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0f57fef4-5924-463e-82be-a8729a2127d3",
+              "name": "list_tab_url",
+              "type": "string",
+              "value": "PASTE_YOUR_LIST_TAB_URL_WITH_GID"
+            },
+            {
+              "id": "316bcc31-e15f-4d06-805a-90996bd101ae",
+              "name": "sample_size",
+              "type": "string",
+              "value": "50"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d75d98e0-60fd-4a46-818c-e9fe285daa23",
+      "name": "Your settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Your settings').first().json.list_tab_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Your settings').first().json.list_tab_url }}"
+        },
+        "options": {}
+      },
+      "id": "34c192e7-6821-48e6-92b8-b19a8e6a964c",
+      "name": "Your list",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// The people to re-check: rows with a Sales Navigator lead id (ACw...), not checked this month,\n// shuffled, up to the sample size. Public linkedin.com/in/ links cannot be re-exported.\nconst s = $('Your settings').first().json;\nconst size = Math.min(Number(s.sample_size) || 50, 2500);\nconst month = $now.toFormat('yyyy-MM');\nconst rows = $input.all().map(i => i.json);\nconst people = [];\nlet noId = 0;\nfor (const r of rows) {\n  const m = String(r['Sales Navigator URL'] || r['Linkedin URL Unique ID'] || '').match(/(ACw[A-Za-z0-9_-]{20,})/);\n  if (!m) { noId++; continue; }\n  if (String(r['Checked on'] || '').startsWith(month)) continue;\n  people.push({ id: m[1], row: r });\n}\nfor (let i = people.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [people[i], people[j]] = [people[j], people[i]]; }\nconst picked = people.slice(0, size);\nif (!picked.length) return [];\nreturn [{ json: { ids: picked.map(p => p.id), rows: picked.map(p => p.row), skipped_without_id: noId } }];\n"
+      },
+      "id": "87faa51e-e89f-4729-b433-9454d47b514f",
+      "name": "Pick people",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.evaboot.com/mcp",
+        "authentication": "bearerAuth",
+        "tool": {
+          "__rl": true,
+          "mode": "list",
+          "value": "verify_email",
+          "cachedResultName": "verify_email"
+        },
+        "inputMode": "json",
+        "jsonInput": "={{ JSON.stringify({ job_name: 'Freshness check ' + $now.toFormat('yyyy-MM-dd'), prospects: $('Pick people').first().json.rows.filter(r => r.Email).map(r => ({ email: r.Email })) }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "1b97789a-00d9-4930-904d-f0309c4a44cf",
+      "name": "Verify the old emails",
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "",
+          "name": "Evaboot MCP (Bearer)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.evaboot.com/mcp",
+        "authentication": "bearerAuth",
+        "tool": {
+          "__rl": true,
+          "mode": "list",
+          "value": "export_profile_list",
+          "cachedResultName": "export_profile_list"
+        },
+        "inputMode": "json",
+        "jsonInput": "={{ JSON.stringify({ profile_ids: $('Pick people').first().json.ids, search_name: 'Freshness check ' + $now.toFormat('yyyy-MM-dd') }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "64c10358-1304-4236-961b-208569703c82",
+      "name": "Re-export with Evaboot",
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        0
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "",
+          "name": "Evaboot MCP (Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "id": "ea4a387b-8cf0-4e01-8518-5fb65174fd98",
+      "name": "Wait 60 s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.evaboot.com/mcp",
+        "authentication": "bearerAuth",
+        "tool": {
+          "__rl": true,
+          "mode": "list",
+          "value": "get_export",
+          "cachedResultName": "get_export"
+        },
+        "inputMode": "json",
+        "jsonInput": "={{ JSON.stringify({ extraction_id: $('Re-export with Evaboot').first().json.structuredContent.result.extraction_id }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "64f8b5c2-d013-4c41-b19b-c51a153e7bdb",
+      "name": "Check the export",
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        0
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "",
+          "name": "Evaboot MCP (Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "21059063-73c3-446e-b516-833610a86da7",
+              "leftValue": "={{ $json.structuredContent.result.status }}",
+              "rightValue": "EXECUTED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e2d84294-bcea-4c15-85ea-5f643cd613f1",
+      "name": "Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Stop instead of waiting forever when the export failed.\nconst r = $json.structuredContent.result;\nif (r.failure_reason || /FAIL|ERROR|CANCEL/i.test(r.status || '')) throw new Error(`The export stopped: ${r.status} ${r.failure_reason || ''}`);\nreturn [$input.first()];\n"
+      },
+      "id": "d5e3d296-0a8c-440d-b4ad-cbdad1b430f3",
+      "name": "Still running?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.evaboot.com/mcp",
+        "authentication": "bearerAuth",
+        "tool": {
+          "__rl": true,
+          "mode": "list",
+          "value": "get_email_verification_job",
+          "cachedResultName": "get_email_verification_job"
+        },
+        "inputMode": "json",
+        "jsonInput": "={{ JSON.stringify({ job_id: $('Verify the old emails').first().json.structuredContent.result.job_id }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "b7c0ffce-2a34-4c72-af8b-8a0ef9f890c0",
+      "name": "Check the verification",
+      "type": "@n8n/n8n-nodes-langchain.mcpClient",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "",
+          "name": "Evaboot MCP (Bearer)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0ceb7ca7-3058-4856-97b0-1f534f7443aa",
+              "leftValue": "={{ $json.structuredContent?.result?.status === 'complete' || !$('Verify the old emails').first().json.structuredContent?.result?.job_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "61bb0dce-10e8-434a-b786-fdd469b11c17",
+      "name": "Verified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Stop instead of waiting forever when the email check failed.\nconst r = $json.structuredContent?.result || {};\nif (r.error_message || /fail|error|cancel/i.test(r.status || '')) throw new Error(`The email check stopped: ${r.status} ${r.error_message || ''}`);\nreturn [$input.first()];\n"
+      },
+      "id": "de14e15f-b047-41fd-a649-0f7951759dfe",
+      "name": "Verification failed?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "0d4693c0-3965-4cdb-8910-e5ac3ca61035",
+      "name": "Wait 30 s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Same rules as freshness.py compare: same job, new title, left the company, not found; then the email,\\n// where today's verification of the old address beats a comparison of two finder results.\nconst norm = s => String(s || '').toLowerCase().replace(/,/g, ' ').split(/\\s+/).filter(Boolean).join(' ');\nconst idOf = p => (String(p['Linkedin URL Unique ID'] || p['Sales Navigator URL'] || '').match(/(ACw[A-Za-z0-9_-]{20,})/) || [])[1];\nconst fresh = Object.fromEntries(($('Check the export').last().json.structuredContent.result.prospects || []).map(p => [idOf(p), p]));\nconst ACTIONS = { 'same job': 'keep', 'new title': 'update the title',\n                  'left the company': 'replace: find who holds the role now', 'not found': 'remove: the profile is gone or private' };\nconst checkedOn = $now.toFormat('yyyy-MM-dd');\nconst today = Object.fromEntries(($('Check the verification').last().json.structuredContent?.result?.prospects || [])\n  .map(v => [String(v.email).toLowerCase(), String(v.email_validity || '').toLowerCase()]));\nconst picked = $('Pick people').first().json;\nreturn picked.ids.map((id, k) => {\n  const o = picked.rows[k], n = fresh[id];\n  let status = 'not found';\n  if (n) {\n    // The first company field both sides have, like freshness.py.\n    const f = ['Company Linkedin URL Unique ID', 'Company Domain', 'Company Name'].find(k => o[k] && n[k]);\n    if (!f || norm(o[f]) !== norm(n[f])) status = 'left the company';\n    else if (norm(o['Current Job']) !== norm(n['Current Job'])) status = 'new title';\n    else status = 'same job';\n  }\n  const oldEmail = String(o['Email'] || '').toLowerCase(), newEmail = String(n && n['Email'] || '').toLowerCase();\n  const newSafe = String(n && n['Email Status'] || '').toLowerCase() === 'safe';\n  let email = 'unknown';\n  if (n) email = !oldEmail ? (newEmail ? 'new email found' : 'still none')\n    : (oldEmail !== newEmail ? (newEmail ? 'changed' : 'lost')\n      : (String(o['Email Status'] || '').toLowerCase() === 'safe' && !newSafe ? 'no longer safe' : 'same'));\n  const now = oldEmail ? (today[oldEmail] || '') : '';\n  if (now) email = status === 'left the company' ? (now === 'safe' ? 'old email still accepts mail' : `old email ${now}`)\n    : (now === 'safe' ? 'old email still verifies' : `old email ${now}`);\n  let action = ACTIONS[status];\n  if (['same job', 'new title'].includes(status)) {\n    if (email === 'new email found' || (email.startsWith('old email ') && !email.endsWith('verifies')))\n      action = status === 'same job' ? (newSafe ? 'update the email' : 'check the email') : action + ' and the email';\n    else if (!now && ['changed', 'lost', 'no longer safe'].includes(email))\n      action = status === 'same job' ? 'update the email' : action + ' and the email';\n  }\n  return { json: {\n    'Sales Navigator URL': o['Sales Navigator URL'], 'Status': status, 'New title': n ? n['Current Job'] || '' : '',\n    'New company': n ? n['Company Name'] || '' : '', 'New email': n ? n['Email'] || '' : '',\n    'Email now': email + (n && n['Email Status'] && !email.startsWith('old email') ? ` (new: ${n['Email Status']})` : ''),\n    'Action': action, 'Checked on': checkedOn,\n  } };\n});\n"
+      },
+      "id": "5c1f93e6-fa6f-4f4c-9b11-810b5690e5c4",
+      "name": "Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Your settings').first().json.list_tab_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Your settings').first().json.list_tab_url }}"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Sales Navigator URL"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a61402ba-10fa-4479-a51b-114e2a4e6f87",
+      "name": "Update your list",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "First of the month": {
+      "main": [
+        [
+          {
+            "node": "Your settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your settings": {
+      "main": [
+        [
+          {
+            "node": "Your list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your list": {
+      "main": [
+        [
+          {
+            "node": "Pick people",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick people": {
+      "main": [
+        [
+          {
+            "node": "Verify the old emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify the old emails": {
+      "main": [
+        [
+          {
+            "node": "Re-export with Evaboot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-export with Evaboot": {
+      "main": [
+        [
+          {
+            "node": "Wait 60 s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 60 s": {
+      "main": [
+        [
+          {
+            "node": "Check the export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the export": {
+      "main": [
+        [
+          {
+            "node": "Done?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare": {
+      "main": [
+        [
+          {
+            "node": "Update your list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still running?": {
+      "main": [
+        [
+          {
+            "node": "Wait 60 s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the verification": {
+      "main": [
+        [
+          {
+            "node": "Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30 s": {
+      "main": [
+        [
+          {
+            "node": "Check the verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done?": {
+      "main": [
+        [
+          {
+            "node": "Check the verification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Still running?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verified?": {
+      "main": [
+        [
+          {
+            "node": "Compare",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verification failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verification failed?": {
+      "main": [
+        [
+          {
+            "node": "Wait 30 s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
