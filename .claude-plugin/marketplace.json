@@ -1,0 +1,17 @@
+{
+  "name": "evaboot-labs-b2b-list-freshness-check",
+  "owner": {
+    "name": "Evaboot",
+    "url": "https://evaboot.com"
+  },
+  "metadata": {
+    "description": "A B2B list freshness check: who left, who moved, which emails to fix."
+  },
+  "plugins": [
+    {
+      "name": "b2b-list-freshness-check",
+      "source": "./",
+      "description": "Checks how stale a B2B contact list is: an AI Agent re-exports its people from LinkedIn Sales Navigator through Evaboot, verifies the old emails, and reports who left, who changed title and which emails to fix, with one action per person."
+    }
+  ]
+}

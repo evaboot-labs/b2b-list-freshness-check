@@ -1,0 +1,7 @@
+{"layout": "flow", "eyebrow": "evaboot-labs · b2b-list-freshness-check", "headline": "How stale is your list?",
+ "subline": "Old contacts re-checked against Sales Navigator. One action per person.",
+ "nodes": [{"label": "01 · Sample", "title": "Your list", "caption": "50 people or all"},
+           {"label": "02 · Re-check", "title": "Evaboot", "caption": "Today's job and email"},
+           {"label": "03 · Compare", "title": "freshness.py", "caption": "Left, moved, same"},
+           {"label": "04 · Result", "title": "Actions", "caption": "Keep, update, replace"}],
+ "spec": "server <em>mcp.evaboot.com/mcp</em> · 1 credit per person re-checked"}
